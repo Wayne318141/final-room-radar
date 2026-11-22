@@ -13,14 +13,14 @@
   </style>
 </head>
 <body>
-  <header class="wrap top"><a class="brand" href="./">⌂ RoomRadar　資料管理</a><a href="#api-docs" id="apiDocsLink">開啟 FastAPI API 文件 ↗</a></header>
+  <header class="wrap top"><a class="brand" href="./">⌂ RoomRadar　資料管理</a><a href="#api-status" id="apiDocsLink">檢查 API 狀態 ↗</a></header>
   <main class="wrap">
     <section class="heading"><div><div class="eyebrow">Database & API workspace</div><h1>資料管理後台</h1><p>檢視資料庫內容，編輯或移除已刊登房源。</p></div><button class="btn btn-green" id="refresh">重新整理資料</button></section>
     <section class="stats" id="stats"></section>
     <nav class="tabs" aria-label="資料表"><button class="tab active" data-tab="listings">房源</button><button class="tab" data-tab="users">使用者</button><button class="tab" data-tab="favorites">收藏紀錄</button><button class="tab" data-tab="posters">海報資料</button></nav>
     <section class="panel"><div class="panel-head"><h2 id="panelTitle">房源資料表</h2><span id="rowCount"></span></div><div class="table-wrap" id="tableContainer"></div></section>
     <p class="notice">這是課程原型管理頁，目前沒有管理員登入保護。請只在本機或可信任的課堂環境使用；正式公開部署前要加入帳號權限。</p>
-    <footer>RoomRadar · SQLite 資料管理 · <a href="#api-docs" id="apiDocsFooter">FastAPI 互動式 API 文件</a></footer>
+    <footer>RoomRadar · Cloudflare D1 資料管理 · <a href="#api-status" id="apiDocsFooter">檢查 API 狀態</a></footer>
   </main>
   <div class="modal-bg" id="editModal" role="dialog" aria-modal="true" aria-labelledby="editTitle"><div class="modal"><div class="modal-head"><h2 id="editTitle">編輯房源</h2><button class="close" id="closeEdit" aria-label="關閉">×</button></div><form id="editForm"><input type="hidden" name="id"><div class="form-grid">
     <div class="field wide"><label for="editTitleInput">房源標題</label><input id="editTitleInput" name="title" minlength="4" maxlength="80" required></div>
@@ -38,7 +38,7 @@
     const API_BASE=(window.ROOMRADAR_API_BASE||'').replace(/\/$/,'');
     const apiUrl=path=>`${API_BASE}${path}`;
     const apiKey=()=>{let key=sessionStorage.getItem('roomradar-admin-key');if(!key){key=prompt('請輸入部署時設定的管理密鑰');if(key)sessionStorage.setItem('roomradar-admin-key',key)}return key||''};
-    document.getElementById('apiDocsLink').href=apiUrl('/docs');document.getElementById('apiDocsFooter').href=apiUrl('/docs');
+    document.getElementById('apiDocsLink').href=apiUrl('/api/health');document.getElementById('apiDocsFooter').href=apiUrl('/api/health');
     const escapeHTML=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     const formatDate=value=>value?new Date(value.replace(' ','T')+'Z').toLocaleString('zh-TW'):'—';
     let data={listings:[],users:[],favorites:[],posters:[],counts:{}},activeTab='listings',toastTimer;

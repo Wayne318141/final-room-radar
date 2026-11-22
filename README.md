@@ -1,46 +1,65 @@
 # RoomRadar
 
-大學生智慧租屋媒合平台。前端提供房源搜尋、篩選、收藏比較、費用試算與含圖片上傳的刊登表單；FastAPI 提供 REST API，SQLite 儲存房源、使用者、收藏與圖片資訊。介面使用響應式排版，並以 Unsplash 圖片 CDN 顯示示意房間照片；資料庫房源與照片不是實際租屋承諾。
+RoomRadar 是給大學生使用的租屋媒合課程專題。此版本採用免費部署組合：Cloudflare Pages 提供網站與 Functions API，Cloudflare D1 保存房源、使用者、收藏和小型房源圖片。GitHub Pages 可保留作為靜態展示，但資料寫入功能請使用 Cloudflare Pages 網址。
 
-## 本機啟動
+## 功能
 
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-uvicorn main:app --reload
-```
+- 房源搜尋、地區／租金／房型／設備篩選與排序。
+- 每月租屋費用試算。
+- 建立匿名訪客 ID，收藏房源並保存到 D1。
+- 房東透過 multipart 表單刊登房源，含必填驗證、同意欄位及可選圖片上傳。
+- 管理頁可檢視、編輯、刪除房源、使用者、收藏和圖片資料。
+- `/api/health` 檢查 API 與 D1 連線。
 
-開啟 `http://127.0.0.1:8000`。資料管理頁面在 `/admin`，API 文件在 `/docs`。本機未設定 `ROOMRADAR_ADMIN_KEY` 時，管理 API 會關閉；用 `.env` 或終端環境變數設定後才能使用。
+## Cloudflare 免費部署
 
-## 正式部署架構
+### 1. 把本資料夾內容更新到 GitHub
 
-- `static/`：純靜態網站，可同時部署至 GitHub Pages 與 Cloudflare Pages。
-- `main.py`：FastAPI API，使用 Render Blueprint 部署；Render persistent disk 保存 SQLite 與已上傳圖片。磁碟服務需選擇支援 persistent disk 的方案。
-- `static/config.js`：前端 API 位址；先部署 API，再將空字串改為 API 網址（例：`https://roomradar-api.onrender.com`），然後推送變更。
+將本資料夾內的檔案與資料夾上傳到 `Wayne318141/final-room-radar` 儲存庫根目錄，遇到同名檔案選擇覆蓋。確認有上傳 `functions/`（內含 `api/[[path]].js`）、`schema.sql`，以及 `static/_routes.json`。不要上傳 `__pycache__`、`.env` 或管理密鑰。
 
-### 發布順序
+### 2. 建立 Cloudflare Pages 網站
 
-1. 將 `RoomRadar` 資料夾內容推送到 GitHub 新儲存庫的 `main` 分支。請不要把管理密鑰、`.env`、資料庫檔案或上傳照片提交到 Git。
-2. 在 Render 建立 Blueprint，選取儲存庫並套用 `render.yaml`。部署後，在 Render 環境設定中確認 `ROOMRADAR_ADMIN_KEY` 已產生，並複製 API 網址。
-3. 將 `static/config.js` 的 `ROOMRADAR_API_BASE` 設成 Render API 網址並推送。此網站有匿名瀏覽者 ID；瀏覽器要允許網站向 API 網址送出跨網域請求。
-4. 在 GitHub 儲存庫 `Settings → Pages` 選擇 GitHub Actions。推送 `static/` 內容時，`.github/workflows/pages.yml` 會自動部署靜態網站。
-5. 在 Cloudflare `Workers & Pages → Create application → Pages → Connect to Git` 匯入同一個 GitHub 儲存庫；Build command 設 `exit 0`，Build output directory 設 `static`。以後推送會自動更新 Cloudflare Pages。
-6. 待兩個網站網址建立後，把 Render 的 `ROOMRADAR_ALLOWED_ORIGINS` 改成實際前端來源，以逗號分隔（GitHub Pages 與 Cloudflare Pages 網址），不要保留萬用 `*`；重新部署 API。
+1. 登入 Cloudflare，進入 **Workers & Pages → Create application → Pages → Connect to Git**。
+2. 選 `Wayne318141/final-room-radar`。
+3. Build command 輸入 `exit 0`，Build output directory 輸入 `static`，其餘保持預設後部署。
+4. Pages 會從儲存庫根目錄讀取 `functions/`，網站上線後複製 `*.pages.dev` 網址。
 
-GitHub Pages 和 Cloudflare Pages 只能提供靜態前端，不能直接執行本專案的 Python/FastAPI API。兩個網站共用同一個 Render API 與資料庫；Render 的磁碟服務可能產生費用，SQLite 設定以單一 API instance 為前提。管理員密鑰只設定在 Render，不要寫進 `config.js` 或 GitHub。
+### 3. 建立並初始化持久資料庫
 
-## 功能及 API
+1. Cloudflare 左側進入 **Storage & databases → D1 SQL Database → Create database**，名稱輸入 `roomradar-db`。
+2. 開啟資料庫的 **Console**，把本儲存庫 `schema.sql` 全部內容貼上並執行一次。這會建立資料表並加入示範房源。
+3. 回到 **Workers & Pages → RoomRadar Pages 專案 → Settings → Functions → D1 database bindings → Add binding**。
+4. Variable name 輸入 `DB`，Database 選 `roomradar-db`，儲存後重新部署最新版本。
+5. 到 **Settings → Variables and Secrets** 新增 Secret：名稱 `ADMIN_KEY`，值設定成自己記得住的長密碼。不要把密碼寫進 GitHub 檔案或傳到聊天。
+6. 再觸發一次部署，讓 Function 讀到 Secret。開啟 `https://你的專案.pages.dev/api/health`，應看到 `{"ok":true,"database":"D1"}`。
 
-- `GET /api/listings`：依地區、租金、房型、設備與關鍵字篩選房源。
-- `POST /api/cost-estimates`：試算租金、管理費、水電、網路與使用者自填補助。
-- `POST /api/users` 與 `/api/users/{id}/favorites`：匿名展示使用者與收藏。
-- `POST /api/listings`：驗證 multipart 表單並刊登房源；海報支援 JPG、PNG、WebP，上限 2 MB。
-- `/api/admin/*` 與海報替換／刪除：必須帶 `X-Admin-Key`，由 Render 的 `ROOMRADAR_ADMIN_KEY` 驗證。
-- `GET /docs`：FastAPI 互動式 API 文件。
+### 4. 使用網站
 
-表單包含必填欄位、前後端驗證、錯誤提示、圖片預覽及上傳限制。資料庫由應用啟動時建立，首次無房源資料時加入示範房源。
+- 請用 Cloudflare Pages 網址測試搜尋、收藏、費用試算和刊登表單；提交測試房源後重新整理，資料仍應存在。
+- 管理頁在 Cloudflare 網站網址後加 `/admin.html`。第一次操作會詢問 `ADMIN_KEY`，只存在該瀏覽器分頁的 sessionStorage。
+- GitHub Pages（`https://wayne318141.github.io/final-room-radar/`）目前是靜態展示網址，不會連到 Cloudflare D1；若需它也能寫入資料，部署好 Cloudflare 後再把 `static/config.js` 的 API 位址改成 Cloudflare 網址，並重新上傳。
 
-## 正式公開前仍須注意
+## API
 
-這是課程專題原型，不是已完成法遵、房東驗證或交易服務的租屋市場。正式招募真實租客前，仍應補上服務條款與隱私權告知、個資刪除／申訴方式、刊登審核與濫用處理、資料備份與監控；目前匿名帳號存在瀏覽器本機，尚無正式登入及身分驗證。示意房源及照片不可冒充真實出租物件。正式公開前也必須由帳號持有人完成 GitHub、Cloudflare、Render 權限授權與部署設定；本資料夾提供部署設定，並未代替帳號發布或產生公開網址。
+| 方法 | 路徑 | 用途 |
+| --- | --- | --- |
+| GET | `/api/health` | API 與 D1 健康狀態 |
+| GET | `/api/listings` | 搜尋／篩選房源 |
+| GET | `/api/listings/{id}` | 單筆房源 |
+| POST | `/api/listings` | multipart 表單刊登房源 |
+| POST | `/api/users` | 建立匿名訪客 |
+| GET | `/api/users/{id}/favorites` | 讀取收藏 |
+| POST／DELETE | `/api/users/{id}/favorites/{listing_id}` | 新增／移除收藏 |
+| POST | `/api/cost-estimates` | 費用試算 |
+| GET | `/api/admin/overview` | 管理資料總覽（需 `X-Admin-Key`） |
+| PUT／DELETE | `/api/admin/listings/{id}` | 編輯／刪除房源（需管理密鑰） |
+| PUT／DELETE | `/api/admin/users/{id}` | 編輯／刪除使用者（需管理密鑰） |
+| DELETE | `/api/admin/favorites/{id}` | 刪除收藏（需管理密鑰） |
+| GET／PUT／DELETE | `/api/listings/{id}/poster` | 查看圖片；管理操作需管理密鑰 |
+
+## 免費方案限制
+
+- 房源圖片直接存為 D1 BLOB，單張限制 1.5 MB；不使用可能產生額外費用的圖片儲存服務。
+- Cloudflare Workers／Pages Functions 與 D1 免費額度有每日請求、讀取及寫入上限，適合課堂展示與小型 MVP；超出免費上限時請求會受限。
+- D1 是持久化資料庫；請在 Cloudflare D1 Console 管理資料。`main.py` 是本機 FastAPI＋SQLite 示範版，不是 Cloudflare Pages 的線上執行後端。
+- 示範房源不是實際租屋承諾。正式面向公眾前應加上資料隱私告知、房源審核、檢舉和備份流程。
